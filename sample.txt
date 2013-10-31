@@ -1,0 +1,78 @@
+#include<iostream>
+#include<initializer_list>
+#include<string>
+#include<vector>
+#include"FunctionalVisitor.h"
+
+using FileVisitor = FunctionalVisitor<class Files, class Dir, class File>;
+
+struct Files :public FileVisitor::Root
+{
+	Files(const std::string&name)
+		:name(name)
+	{}
+	std::string name;
+};
+
+struct File :public FileVisitor::Leaf<File>
+{
+	File(const std::string& name, int size)
+	:base_type(name), size(size)
+	{}
+	int size;
+};
+
+struct Dir :public FileVisitor::Leaf<Dir>
+{
+	Dir(const std::string&name, const std::initializer_list<Files*>&list)
+	:base_type(name), data(list)
+	{}
+	std::vector<Files*>data;
+};
+
+int main()
+{
+
+	auto files = new Dir("新しいフォルダ1", {
+		new Dir("新しいフォルダ1", { new File("txt.txt", 60), new File("gnp.png", 170) })
+		, new Dir("新しいフォルダ2", { new File("exe.exe", 20), new File("gpj.jpg", 50) })
+	});
+
+	struct Size
+	{
+		size_t operator()(const File&file)
+		{
+			return file.size;
+		}
+		size_t operator()(const Dir&dir)
+		{
+			size_t sum = 0;
+			for (auto&x : dir.data)
+				sum+=FileVisitor::apply_visitor<size_t>(*this,*x);
+			return sum;
+		}
+	};
+
+	std::cout << FileVisitor::apply_visitor<size_t>(Size(),*files);
+
+	struct OutPut
+	{
+		void operator()(const File&file,size_t n)
+		{
+			for (int i = 0; i < n; ++i)
+				std::cout << '\t';
+			std::cout <<file.name<<std::endl;
+		}
+		void operator()(const Dir&dir, size_t n)
+		{
+			for (int i = 0; i < n; ++i)
+				std::cout << '\t';
+			std::cout << dir.name << std::endl;
+			for (auto&x : dir.data)
+				FileVisitor::apply_visitor<void>(*this, *x,n+1);	
+		}
+	};
+
+	FileVisitor::apply_visitor<void>(OutPut(), *files, 0);
+
+}
